@@ -18,7 +18,7 @@ public class FirebaseConfig {
             return FirebaseApp.getInstance();
         }
 
-        FileInputStream serviceAccount = new FileInputStream("src/main/resources/arbeitmate-firebase-adminsdk-fbsvc-0e6ac082e0.json");
+        FileInputStream serviceAccount = new FileInputStream("src/main/resources/arbeitmate-firebase-adminsdk.json");
 
         FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials(GoogleCredentials.fromStream(serviceAccount))
