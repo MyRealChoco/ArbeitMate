@@ -235,6 +235,9 @@ public class CompanyService {
         }
 
         boolean exists = companyMemberRoleRepository.existsByCompanyAndMemberAndRole(company, cm.getMember(), role);
+        if (exists) {
+            throw new IllegalStateException("이미 이 역할이 부여된 직원입니다.");
+        }
 
         // 엔티티 생성
         CompanyMemberRole cmr = CompanyMemberRole.link(company, cm.getMember(), role);

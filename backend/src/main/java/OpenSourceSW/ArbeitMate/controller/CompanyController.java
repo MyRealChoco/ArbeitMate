@@ -126,7 +126,7 @@ public class CompanyController {
     }
 
     /**
-     * 직원에게 역할군 부여
+     * 직원에게 역할군 부여 (사장 전용)
      */
     @PostMapping("/{companyId}/workers/{companyMemberId}/roles")
     public ResponseEntity<Void> assignRoleToWorker(
