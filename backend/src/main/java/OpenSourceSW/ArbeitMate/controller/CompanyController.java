@@ -6,6 +6,7 @@ import OpenSourceSW.ArbeitMate.security.AuthPrincipal;
 import OpenSourceSW.ArbeitMate.service.CompanyService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -76,7 +77,7 @@ public class CompanyController {
             @PathVariable UUID companyId) {
 
         companyService.deleteCompany(principal.memberId(), companyId);
-        return ResponseEntity.noContent().build();
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 
     /**
@@ -99,7 +100,7 @@ public class CompanyController {
             @PathVariable UUID companyId,
             @PathVariable UUID companyMemberId) {
         companyService.removeWorker(principal.memberId(), companyId, companyMemberId);
-        return ResponseEntity.noContent().build();
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 
     /**
@@ -135,6 +136,6 @@ public class CompanyController {
             @PathVariable UUID companyMemberId,
             @Valid @RequestBody AssignRoleRequest req) {
         companyService.assignRoleToWorker(principal.memberId(), companyId, companyMemberId, req.getRoleId());
-        return ResponseEntity.status(500).build();
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 }
