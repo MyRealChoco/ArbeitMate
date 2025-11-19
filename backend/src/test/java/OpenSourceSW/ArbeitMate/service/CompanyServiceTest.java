@@ -486,13 +486,13 @@ class CompanyServiceTest {
 
         // 역할 생성
         CompanyRole role = CompanyRole.create(company, "홀");
-        List<UUID> roleIds = new ArrayList<>();
         UUID roleId = UUID.randomUUID();
-        roleIds.add(roleId);
         ReflectionTestUtils.setField(role, "id", roleId);
 
+        List<UUID> roleIds = List.of(roleId);
+
         when(companyRepository.findById(companyId)).thenReturn(Optional.of(company));
-        when(companyRoleRepository.findById(roleId)).thenReturn(Optional.of(role));
+        when(companyRoleRepository.findAllById(roleIds)).thenReturn(List.of(role));
         when(companyMemberRoleRepository.existsByCompanyAndMemberAndRole(company, worker, role))
                 .thenReturn(false);
 
@@ -562,54 +562,17 @@ class CompanyServiceTest {
 
         // role 은 company2 소속
         CompanyRole otherRole = CompanyRole.create(company2, "홀");
-        List<UUID> roleIds = new ArrayList<>();
         UUID roleId = UUID.randomUUID();
-        roleIds.add(roleId);
         ReflectionTestUtils.setField(otherRole, "id", roleId);
+        List<UUID> roleIds = List.of(roleId);
 
         when(companyRepository.findById(companyId1)).thenReturn(Optional.of(company1));
-        when(companyRoleRepository.findById(roleId)).thenReturn(Optional.of(otherRole));
+        when(companyRoleRepository.findAllById(roleIds)).thenReturn(List.of(otherRole));
 
         // when & then
-        assertThatThrownBy(() -> companyService.assignRoleToWorker(ownerId, companyId1, workerCmId, roleIds))
-                .isInstanceOf(IllegalStateException.class);
-
-        verify(companyMemberRoleRepository, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("이미 같은 역할이 부여된 직원에게 다시 부여하면 예외 발생")
-    void assignRoleToWorker_duplicateRole_throws() {
-        // given
-        UUID ownerId = UUID.randomUUID();
-        Member owner = newMember("owner@test.com", "Owner");
-        ReflectionTestUtils.setField(owner, "id", ownerId);
-
-        Member worker = newMember("w@test.com", "Worker");
-        ReflectionTestUtils.setField(worker, "id", UUID.randomUUID());
-
-        Company company = newCompany("카페 A", owner, "서울시", "CODE1");
-        UUID companyId = UUID.randomUUID();
-        ReflectionTestUtils.setField(company, "id", companyId);
-
-        CompanyMember workerCm = CompanyMember.create(company, worker, MembershipRole.WORKER, 10030);
-        UUID workerCmId = UUID.randomUUID();
-        ReflectionTestUtils.setField(workerCm, "id", workerCmId);
-
-        CompanyRole role = CompanyRole.create(company, "홀");
-        List<UUID> roleIds = new ArrayList<>();
-        UUID roleId = UUID.randomUUID();
-        roleIds.add(roleId);
-        ReflectionTestUtils.setField(role, "id", roleId);
-
-        when(companyRepository.findById(companyId)).thenReturn(Optional.of(company));
-        when(companyRoleRepository.findById(roleId)).thenReturn(Optional.of(role));
-        when(companyMemberRoleRepository.existsByCompanyAndMemberAndRole(company, worker, role))
-                .thenReturn(true);
-
-        // when & then
-        assertThatThrownBy(() -> companyService.assignRoleToWorker(ownerId, companyId, workerCmId, roleIds))
-                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() ->
+                companyService.assignRoleToWorker(ownerId, companyId1, workerCmId, roleIds)
+        ).isInstanceOf(IllegalStateException.class);
 
         verify(companyMemberRoleRepository, never()).save(any());
     }

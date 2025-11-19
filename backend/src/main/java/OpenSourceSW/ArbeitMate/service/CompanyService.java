@@ -234,16 +234,14 @@ public class CompanyService {
         if(roles.size() != roleIds.size()) {
             throw new IllegalArgumentException("존재하지 않는 역할 ID가 포함되어 있습니다.");
         }
-        for(CompanyRole role : roles) {
-            if(!role.getCompany().getId().equals(companyId)) {
-                throw new IllegalStateException("해당 매장의 역할군이 아닙니다." + role.getId());
-            }
-        }
 
         // 이미 부여된 역할은 제외, 없는 것만 새로 엔티티 생성
         for(CompanyRole role : roles) {
-            boolean exists = companyMemberRoleRepository.existsByCompanyAndMemberAndRole(company, cm.getMember(), role);
+            if(!role.getCompany().getId().equals(companyId)) {
+                throw new IllegalStateException("해당 매장의 역할군이 아닙니다.");
+            }
 
+            boolean exists = companyMemberRoleRepository.existsByCompanyAndMemberAndRole(company, cm.getMember(), role);
             if (!exists) {
                 CompanyMemberRole cmr = CompanyMemberRole.link(company, cm.getMember(), role);
                 companyMemberRoleRepository.save(cmr);
