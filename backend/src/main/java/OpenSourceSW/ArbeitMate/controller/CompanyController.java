@@ -1,19 +1,17 @@
 package OpenSourceSW.ArbeitMate.controller;
 
-import OpenSourceSW.ArbeitMate.dto.request.CreateCompanyRequest;
-import OpenSourceSW.ArbeitMate.dto.request.ParticipateCompanyRequest;
-import OpenSourceSW.ArbeitMate.dto.request.UpdateCompanyRequest;
-import OpenSourceSW.ArbeitMate.dto.response.CreateCompanyResponse;
-import OpenSourceSW.ArbeitMate.dto.response.ParticipateCompanyResponse;
-import OpenSourceSW.ArbeitMate.dto.response.UpdateCompanyResponse;
+import OpenSourceSW.ArbeitMate.dto.request.*;
+import OpenSourceSW.ArbeitMate.dto.response.*;
 import OpenSourceSW.ArbeitMate.security.AuthPrincipal;
 import OpenSourceSW.ArbeitMate.service.CompanyService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -52,7 +50,7 @@ public class CompanyController {
     public ResponseEntity<UpdateCompanyResponse> updateCompany(
             @AuthenticationPrincipal AuthPrincipal principal,
             @PathVariable UUID companyId,
-            @RequestBody UpdateCompanyRequest req) {
+            @Valid @RequestBody UpdateCompanyRequest req) {
 
         var res = companyService.updateCompany(principal.memberId(), companyId, req);
         return ResponseEntity.ok(res);
@@ -79,6 +77,65 @@ public class CompanyController {
             @PathVariable UUID companyId) {
 
         companyService.deleteCompany(principal.memberId(), companyId);
-        return ResponseEntity.noContent().build();
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    /**
+     * 회사 직원 목록 조회 (사장 전용)
+     */
+    @GetMapping("/{companyId}/workers")
+    public ResponseEntity<List<CompanyWorkerResponse>> listWorkers(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable UUID companyId) {
+        var res = companyService.listWorkers(principal.memberId(), companyId);
+        return ResponseEntity.ok(res);
+    }
+
+    /**
+     * 특정 직원 매장에서 제외 (사장 전용)
+     */
+    @DeleteMapping("/{companyId}/workers/{companyMemberId}")
+    public ResponseEntity<Void> removeWorker(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable UUID companyId,
+            @PathVariable UUID companyMemberId) {
+        companyService.removeWorker(principal.memberId(), companyId, companyMemberId);
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    /**
+     * 회사 역할군 추가 (사장 전용)
+     */
+    @PostMapping("/{companyId}/roles")
+    public ResponseEntity<CompanyRoleResponse> createRole(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable UUID companyId,
+            @Valid @RequestBody CreateRoleRequest req) {
+        var res = companyService.createRole(principal.memberId(), companyId, req);
+        return ResponseEntity.ok(res);
+    }
+
+    /**
+     * 회사 역할군 목록 조회
+     */
+    @GetMapping("/{companyId}/roles")
+    public ResponseEntity<List<CompanyRoleResponse>> listRoles(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable UUID companyId) {
+        var res = companyService.listRoles(principal.memberId(), companyId);
+        return ResponseEntity.ok(res);
+    }
+
+    /**
+     * 직원에게 역할군 부여 (사장 전용)
+     */
+    @PostMapping("/{companyId}/workers/{companyMemberId}/roles")
+    public ResponseEntity<Void> assignRoleToWorker(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable UUID companyId,
+            @PathVariable UUID companyMemberId,
+            @Valid @RequestBody AssignRoleRequest req) {
+        companyService.assignRoleToWorker(principal.memberId(), companyId, companyMemberId, req.getRoleIds());
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 }

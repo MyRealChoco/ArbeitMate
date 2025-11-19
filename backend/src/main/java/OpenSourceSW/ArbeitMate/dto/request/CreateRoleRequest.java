@@ -6,7 +6,6 @@ import lombok.Setter;
 
 @Data
 @Setter
-public class UpdateCompanyRequest {
-    @NotBlank private String name;
-    @NotBlank private String address;
+public class CreateRoleRequest {
+    @NotBlank private String name; // 예) 홀, 주방, 서빙 등
 }
