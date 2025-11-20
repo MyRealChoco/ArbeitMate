@@ -15,6 +15,8 @@ public interface SchedulePeriodRepository extends JpaRepository<SchedulePeriod, 
 
     boolean existsByCompanyIdAndName(UUID companyId, String name);
 
+    List<SchedulePeriod> findByCompanyIdOrderByStartDateAsc(UUID companyId);
+
     /// 시작기간과 종료기간이 겹치는게 존재하는지 검사
     @Query("""
         select case when count(p) > 0 then true else false end

@@ -5,6 +5,7 @@ import OpenSourceSW.ArbeitMate.dto.request.CreateScheduleSlotsRequest;
 import OpenSourceSW.ArbeitMate.dto.request.CreateStaffingTemplateRequest;
 import OpenSourceSW.ArbeitMate.dto.request.CreateWeeklyPeriodRequest;
 import OpenSourceSW.ArbeitMate.dto.response.SchedulePeriodResponse;
+import OpenSourceSW.ArbeitMate.dto.response.SchedulePeriodWithSlotsResponse;
 import OpenSourceSW.ArbeitMate.dto.response.ScheduleSlotResponse;
 import OpenSourceSW.ArbeitMate.dto.response.StaffingTemplateResponse;
 import OpenSourceSW.ArbeitMate.security.AuthPrincipal;
@@ -19,15 +20,18 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 사장 전용
+ */
 @RestController
-@RequestMapping("/compaines/{companyId}/schedule")
+@RequestMapping("/companies/{companyId}/schedule")
 @RequiredArgsConstructor
 public class ScheduleController {
 
     private final ScheduleService scheduleService;
 
     /**
-     * 주간 스케쥴 기간 생성 (사장 전용)
+     * 주간 스케쥴 기간 생성
      */
     @PostMapping("/create/weekly")
     public ResponseEntity<SchedulePeriodResponse> createWeeklySchedule(
@@ -40,7 +44,7 @@ public class ScheduleController {
     }
 
     /**
-     * 월간 스케쥴 기간 생성 (사장 전용)
+     * 월간 스케쥴 기간 생성
      */
     @PostMapping("/create/monthly")
     public ResponseEntity<SchedulePeriodResponse> createMonthlySchedule(
@@ -63,6 +67,31 @@ public class ScheduleController {
             @Valid @RequestBody CreateScheduleSlotsRequest req) {
 
         var res = scheduleService.createSlots(principal.memberId(), companyId, periodId, req);
+        return ResponseEntity.ok(res);
+    }
+
+    /**
+     * 특정 기간 + 슬롯 조회
+     */
+    @GetMapping("/periods/{periodId}")
+    public ResponseEntity<SchedulePeriodWithSlotsResponse> getPeriodWithSlots(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable UUID companyId,
+            @PathVariable UUID periodId) {
+
+        var res = scheduleService.getPeriodWithSlots(principal.memberId(), companyId, periodId);
+        return ResponseEntity.ok(res);
+    }
+
+    /**
+     * 매장의 모든 기간 + 각 기간별 슬롯 목록 조회
+     */
+    @GetMapping("/periods-with-slots")
+    public ResponseEntity<List<SchedulePeriodWithSlotsResponse>> listPeriodsWithSlots(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable UUID companyId) {
+
+        var res = scheduleService.listPeriodsWithSlots(principal.memberId(), companyId);
         return ResponseEntity.ok(res);
     }
 

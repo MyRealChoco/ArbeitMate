@@ -5,6 +5,7 @@ import OpenSourceSW.ArbeitMate.domain.enums.PeriodStatus;
 import OpenSourceSW.ArbeitMate.domain.enums.PeriodType;
 import OpenSourceSW.ArbeitMate.dto.request.*;
 import OpenSourceSW.ArbeitMate.dto.response.SchedulePeriodResponse;
+import OpenSourceSW.ArbeitMate.dto.response.SchedulePeriodWithSlotsResponse;
 import OpenSourceSW.ArbeitMate.dto.response.ScheduleSlotResponse;
 import OpenSourceSW.ArbeitMate.dto.response.StaffingTemplateResponse;
 import OpenSourceSW.ArbeitMate.repository.*;
@@ -90,6 +91,49 @@ public class ScheduleService {
         schedulePeriodRepository.save(period);
 
         return SchedulePeriodResponse.from(period);
+    }
+
+    /**
+     * 특정 스케쥴 기간과 그 기간에 속한 모든 슬롯 조회
+     */
+    public SchedulePeriodWithSlotsResponse getPeriodWithSlots(UUID memberId, UUID companyId, UUID periodId) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Company not found"));
+
+        // 회사 소속 멤버인지 확인
+        validateMembersBelongToCompany(memberId, company);
+
+        // 기간 조회
+        SchedulePeriod period = schedulePeriodRepository.findById(periodId)
+                .orElseThrow(() -> new IllegalArgumentException("SchedulePeriod not found"));
+
+        if (!period.getCompany().getId().equals(companyId)) {
+            throw new IllegalStateException("해당 매장의 스케쥴 기간이 아닙니다.");
+        }
+
+        // 해당 기간의 슬롯 조회
+        List<Schedule> schedules = scheduleRepository.findByPeriod(period);
+
+        return SchedulePeriodWithSlotsResponse.of(period, schedules);
+    }
+
+    /**
+     * 스케쥴 기간 및 슬롯 전체 조회
+     */
+    public List<SchedulePeriodWithSlotsResponse> listPeriodsWithSlots(UUID ownerId, UUID companyId) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Company not found"));
+
+        validateOwner(ownerId, company);
+
+        List<SchedulePeriod> periods = schedulePeriodRepository.findByCompanyIdOrderByStartDateAsc(companyId);
+
+        return periods.stream()
+                .map(period -> {
+                    List<Schedule> schedules = scheduleRepository.findByPeriod(period);
+                    return SchedulePeriodWithSlotsResponse.of(period, schedules);
+                })
+                .toList();
     }
 
     /**
@@ -236,10 +280,7 @@ public class ScheduleService {
         }
 
         /// 기존 기간 내 스케쥴이 있다면 삭제
-        List<Schedule> existing = scheduleRepository.findByPeriod(period);
-        if(!existing.isEmpty()) {
-            scheduleRepository.deleteAll(existing);
-        }
+        scheduleRepository.deleteByPeriodId(period.getId());
 
         /// 템플릿 기반 스케쥴 생성
         List<Schedule> newSchedules = new ArrayList<>();
@@ -307,7 +348,6 @@ public class ScheduleService {
         StaffingTemplate template = StaffingTemplate.create(company, templateName, company.getOwner());
 
         // (dow, roleId, startTime, endTime) 기준으로 패턴 집계
-        // headcount는 동일 패턴이 여러 번 있을 경우 max로 사용
         record Key(int dow, UUID roleId, java.time.LocalTime start, java.time.LocalTime end) {}
 
         Map<Key, Integer> headcountMap = new LinkedHashMap<>();
