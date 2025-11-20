@@ -2,9 +2,11 @@ package OpenSourceSW.ArbeitMate.controller;
 
 import OpenSourceSW.ArbeitMate.dto.request.CreateMonthlyPeriodRequest;
 import OpenSourceSW.ArbeitMate.dto.request.CreateScheduleSlotsRequest;
+import OpenSourceSW.ArbeitMate.dto.request.CreateStaffingTemplateRequest;
 import OpenSourceSW.ArbeitMate.dto.request.CreateWeeklyPeriodRequest;
 import OpenSourceSW.ArbeitMate.dto.response.SchedulePeriodResponse;
 import OpenSourceSW.ArbeitMate.dto.response.ScheduleSlotResponse;
+import OpenSourceSW.ArbeitMate.dto.response.StaffingTemplateResponse;
 import OpenSourceSW.ArbeitMate.security.AuthPrincipal;
 import OpenSourceSW.ArbeitMate.service.ScheduleService;
 import jakarta.validation.Valid;
@@ -50,7 +52,7 @@ public class ScheduleController {
     }
 
     /**
-     * 스케쥴 기간 내 날짜/시간대별 1개 이상의 슬롯 생성
+     * 스케쥴 기간 내 날짜/시간대별 슬롯 생성
      */
     @PostMapping("/{periodId}/create/slots")
     public ResponseEntity<List<ScheduleSlotResponse>> createSlots(
@@ -60,6 +62,58 @@ public class ScheduleController {
             @Valid @RequestBody CreateScheduleSlotsRequest req) {
 
         var res = scheduleService.createSlots(principal.memberId(), companyId, periodId, req);
+        return ResponseEntity.ok(res);
+    }
+
+    /**
+     * 필요 인원 템플릿 생성
+     */
+    @PostMapping("/create/staffing-templates")
+    public ResponseEntity<StaffingTemplateResponse> createStaffingTemplate(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable UUID companyId,
+            @Valid @RequestBody CreateStaffingTemplateRequest req) {
+
+        var res = scheduleService.createStaffingTemplate(principal.memberId(), companyId, req);
+        return ResponseEntity.ok(res);
+    }
+
+    /**
+     * 기존에 사용했던 SchedulePeriod 기반 자동 템플릿 생성
+     */
+    @PostMapping("/{periodId}/create-auto/staffing-templates")
+    public ResponseEntity<StaffingTemplateResponse> createTemplateFromPeriod(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable UUID companyId,
+            @PathVariable UUID periodId) {
+
+        var res = scheduleService.createTemplateFromPeriod(principal.memberId(), companyId, periodId);
+        return ResponseEntity.ok(res);
+    }
+
+    /**
+     * 회사의 템플릿 목록 조회
+     */
+    @GetMapping("/staffing-templates")
+    public ResponseEntity<List<StaffingTemplateResponse>> listStaffingTemplates(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable UUID companyId) {
+
+        var res = scheduleService.listStaffingTemplates(principal.memberId(), companyId);
+        return ResponseEntity.ok(res);
+    }
+
+    /**
+     * 특정 기간에 템플릿 적용
+     */
+    @PostMapping("/{periodId}/apply-template/{templateId}")
+    public ResponseEntity<List<ScheduleSlotResponse>> applyTemplateToPeriod(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable UUID companyId,
+            @PathVariable UUID periodId,
+            @PathVariable UUID templateId) {
+
+        var res = scheduleService.applyTemplateToPeriod(principal.memberId(), companyId, periodId, templateId);
         return ResponseEntity.ok(res);
     }
 }
