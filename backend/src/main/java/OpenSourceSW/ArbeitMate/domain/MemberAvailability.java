@@ -56,4 +56,16 @@ public class MemberAvailability {
     public void setCompany(Company company) {
         this.company = company;
     }
+
+    // == 비즈니스 메서드 == //
+    public boolean isEffectiveOn(LocalDate date) {
+        if (date.isBefore(effectiveFrom)) return false;
+        if (effectiveTo != null && date.isAfter(effectiveTo)) return false;
+        return true;
+    }
+
+    public boolean overlaps(LocalTime start, LocalTime end) {
+        // startTime, endTime이랑 start, end가 겹치는지
+        return !this.endTime.isBefore(start) && !this.startTime.isAfter(end);
+    }
 }

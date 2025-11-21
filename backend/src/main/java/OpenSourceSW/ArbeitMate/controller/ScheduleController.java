@@ -1,13 +1,7 @@
 package OpenSourceSW.ArbeitMate.controller;
 
-import OpenSourceSW.ArbeitMate.dto.request.CreateMonthlyPeriodRequest;
-import OpenSourceSW.ArbeitMate.dto.request.CreateScheduleSlotsRequest;
-import OpenSourceSW.ArbeitMate.dto.request.CreateStaffingTemplateRequest;
-import OpenSourceSW.ArbeitMate.dto.request.CreateWeeklyPeriodRequest;
-import OpenSourceSW.ArbeitMate.dto.response.SchedulePeriodResponse;
-import OpenSourceSW.ArbeitMate.dto.response.SchedulePeriodWithSlotsResponse;
-import OpenSourceSW.ArbeitMate.dto.response.ScheduleSlotResponse;
-import OpenSourceSW.ArbeitMate.dto.response.StaffingTemplateResponse;
+import OpenSourceSW.ArbeitMate.dto.request.*;
+import OpenSourceSW.ArbeitMate.dto.response.*;
 import OpenSourceSW.ArbeitMate.security.AuthPrincipal;
 import OpenSourceSW.ArbeitMate.service.ScheduleService;
 import jakarta.validation.Valid;
@@ -157,5 +151,45 @@ public class ScheduleController {
             @PathVariable UUID templateId) {
         scheduleService.deleteTemplate(principal.memberId(), companyId, templateId);
         return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    /**
+     * 가능한 스케쥴 슬롯 목록 조회
+     */
+    @GetMapping("/{periodId}/availability/slots")
+    public ResponseEntity<WorkerAvailabilitySlotsResponse> getWorkerSlots(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable UUID companyId,
+            @PathVariable UUID periodId) {
+
+        var res =  scheduleService.getWorkerAvailabilitySlots(principal.memberId(), companyId, periodId);
+        return ResponseEntity.ok(res);
+    }
+
+    /**
+     * 가용 시간 제출 (근무자)
+     */
+    @PostMapping("/{periodId}/availability/submit")
+    public ResponseEntity<Void> submitAvailability(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable UUID companyId,
+            @PathVariable UUID periodId,
+            @RequestBody SubmitAvailabilityRequest req) {
+
+        scheduleService.submitAvailability(principal.memberId(), companyId, periodId, req);
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    /**
+     * 근무자들 가용 시간 제출 현황 조회
+     */
+    @GetMapping("/{periodId}/availability/submissions")
+    public ResponseEntity<List<AvailabilitySubmissionStatusResponse>> getSubmissionStatus(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable UUID companyId,
+            @PathVariable UUID periodId) {
+
+        var res = scheduleService.getAvailabilitySubmissionStatus(principal.memberId(), companyId, periodId);
+        return ResponseEntity.ok(res);
     }
 }
