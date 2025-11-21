@@ -4,10 +4,7 @@ import OpenSourceSW.ArbeitMate.domain.*;
 import OpenSourceSW.ArbeitMate.domain.enums.PeriodStatus;
 import OpenSourceSW.ArbeitMate.domain.enums.PeriodType;
 import OpenSourceSW.ArbeitMate.dto.request.*;
-import OpenSourceSW.ArbeitMate.dto.response.SchedulePeriodResponse;
-import OpenSourceSW.ArbeitMate.dto.response.SchedulePeriodWithSlotsResponse;
-import OpenSourceSW.ArbeitMate.dto.response.ScheduleSlotResponse;
-import OpenSourceSW.ArbeitMate.dto.response.StaffingTemplateResponse;
+import OpenSourceSW.ArbeitMate.dto.response.*;
 import OpenSourceSW.ArbeitMate.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,9 +24,11 @@ public class ScheduleService {
     private final CompanyMemberRepository companyMemberRepository;
     private final CompanyRoleRepository companyRoleRepository;
     private final CompanyMemberRoleRepository companyMemberRoleRepository;
+    private final FixedShiftRepository fixedShiftRepository;
     private final ScheduleRepository scheduleRepository;
     private final SchedulePeriodRepository schedulePeriodRepository;
     private final StaffingTemplateRepository staffingTemplateRepository;
+
 
     /**
      * 주간 스케쥴 기간 생성
@@ -412,6 +411,110 @@ public class ScheduleService {
         staffingTemplateRepository.delete(template); // 삭제 (items는 orphanRemoval로 같이 삭제)
     }
 
+    /**
+     * 고정 근무자 설정 및 고정 근무 패턴 등록(갱신)
+     */
+    @Transactional
+    public FixedShiftResponse updateFixedShift(UUID ownerId, UUID companyId, UUID companyMemberId, UpdateFixedShiftRequest req) {
+        // 1. 회사 + 사장 검증
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Company not found"));
+
+        validateOwner(ownerId, company);
+
+        // 2. 회사 소속 검증
+        CompanyMember cm = companyMemberRepository.findById(companyMemberId)
+                .orElseThrow(() -> new IllegalArgumentException("CompanyMember not found"));
+        if (!cm.getCompany().getId().equals(companyId)) {
+            throw new IllegalStateException("해당 매장의 직원이 아닙니다.");
+        }
+
+        Member member = cm.getMember();
+
+        // 3. fixedShiftWorker=false 인 경우: 플래그 해제 + 기존 패턴 삭제하고 끝
+        if (!req.isFixedShiftWorker()) {
+            cm.unmarkAsFixedShiftWorker();
+            fixedShiftRepository.deleteByCompanyIdAndMemberId(companyId, member.getId());
+
+            return buildFixedShiftResponse(cm, false, List.of());
+        }
+
+        // 4. fixedShiftWorker=true 인 경우: 기존 패턴 삭제 후 새로 생성(갱신)
+        cm.markAsFixedShiftWorker();
+        fixedShiftRepository.deleteByCompanyIdAndMemberId(companyId, member.getId());
+
+        List<FixedShift> created = new ArrayList<>();
+
+        if (req.getShifts() != null) {
+            for (FixedShiftItemRequest item : req.getShifts()) {
+                CompanyRole role = companyRoleRepository.findById(item.getRoleId())
+                        .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+
+                if (!role.getCompany().getId().equals(companyId)) {
+                    throw new IllegalStateException("해당 매장의 역할군이 아닙니다.");
+                }
+
+                FixedShift fs = FixedShift.create(
+                        company,
+                        member,
+                        role,
+                        item.getDow(),
+                        item.getStartTime(),
+                        item.getEndTime(),
+                        item.getEffectiveFrom(),
+                        item.getEffectiveTo()
+                );
+                created.add(fs);
+            }
+        }
+
+        fixedShiftRepository.saveAll(created);
+
+        List<FixedShiftItemResponse> itemResponses = created.stream()
+                .map(FixedShiftItemResponse::from)
+                .toList();
+
+        return buildFixedShiftResponse(cm, true, itemResponses);
+    }
+
+    /**
+     * 고정 근무자 설정/패턴 조회
+     */
+    public FixedShiftResponse getFixedShiftConfig(UUID ownerId, UUID companyId, UUID companyMemberId) {
+        // 회사 + 사장 검증
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Company not found"));
+        validateOwner(ownerId, company);
+
+        CompanyMember cm = companyMemberRepository.findById(companyMemberId)
+                .orElseThrow(() -> new IllegalArgumentException("CompanyMember not found"));
+
+        if (!cm.getCompany().getId().equals(companyId)) {
+            throw new IllegalStateException("해당 매장의 직원이 아닙니다.");
+        }
+
+        Member member = cm.getMember();
+
+        List<FixedShift> shifts = fixedShiftRepository.findByCompanyIdAndMemberId(companyId, member.getId());
+        List<FixedShiftItemResponse> itemResponses = shifts.stream()
+                .map(FixedShiftItemResponse::from)
+                .toList();
+
+        boolean fixed = cm.isFixedShiftWorker();
+
+        return buildFixedShiftResponse(cm, fixed, itemResponses);
+    }
+
+    ///  고정 근무자 dto 생성 관련 로직
+    private FixedShiftResponse buildFixedShiftResponse(CompanyMember cm, boolean fixed, List<FixedShiftItemResponse> items) {
+        return FixedShiftResponse.builder()
+                .companyMemberId(cm.getId())
+                .memberId(cm.getMember().getId())
+                .memberName(cm.getMember().getName())
+                .fixedShiftWorker(fixed)
+                .shifts(items)
+                .build();
+    }
 
     /// ====== 이름 생성 및 중복 확인 ======
     private String normalizeNameOrGenerateWeekly(UUID companyId, LocalDate start, String rawName) {
@@ -470,7 +573,7 @@ public class ScheduleService {
     }
     // 회사 소속 확인
     private void validateMembersBelongToCompany(UUID memberId, Company company) {
-        if(company.getCompanyMembers().stream() .noneMatch(cm -> cm.getMember().getId().equals(memberId))) {
+        if(company.getCompanyMembers().stream().noneMatch(cm -> cm.getMember().getId().equals(memberId))) {
             throw new IllegalStateException("해당 매장에 속한 멤버가 아닙니다.");
         }
     }
