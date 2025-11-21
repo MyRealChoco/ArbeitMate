@@ -43,6 +43,10 @@ public class MemberAvailability {
     public static MemberAvailability create(Company c, Member m, int dow,
                                             LocalTime start, LocalTime end,
                                             LocalDate from, LocalDate to) {
+        if (!end.isAfter(start)) {
+            throw new IllegalArgumentException("종료시간은 시작시간 이후여야 합니다.");
+        }
+
         MemberAvailability a = new MemberAvailability();
         a.member = m;
         a.dow = dow; a.startTime = start; a.endTime = end;

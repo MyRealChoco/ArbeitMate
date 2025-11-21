@@ -90,6 +90,31 @@ public class ScheduleController {
     }
 
     /**
+     * 근무자 희망 근무 요일/시간 조회
+     */
+    @GetMapping("/worker/availability-pattern")
+    public ResponseEntity<MemberAvailabilityResponse> getMemberAvailabilityPattern(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable UUID companyId) {
+
+        var res = scheduleService.getMemberAvailabilityPattern(principal.memberId(), companyId);
+        return ResponseEntity.ok(res);
+    }
+
+    /**
+     * 근무지 희망 근무 요일/시간 제출(수정)
+     */
+    @PostMapping("/worker/availability-pattern")
+    public ResponseEntity<Void> updateMemberAvailabilityPattern(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable UUID companyId,
+            @RequestBody @Valid UpdateMemberAvailabilityRequest req) {
+
+        scheduleService.updateMemberAvailabilityPattern(principal.memberId(), companyId, req);
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    /**
      * 필요 인원 템플릿 생성
      */
     @PostMapping("/create/staffing-templates")

@@ -421,6 +421,89 @@ public class ScheduleService {
     }
 
     /**
+     * 근무자 희망 근무 시간 등록/갱신
+     */
+    @Transactional
+    public void updateMemberAvailabilityPattern(UUID memberId, UUID companyId, UpdateMemberAvailabilityRequest req) {
+        // 회사 검증
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Company not found"));
+
+        // 회사 소속 멤버인지 확인
+        CompanyMember cm = companyMemberRepository.findByCompanyIdAndMemberId(companyId, memberId)
+                .orElseThrow(() -> new IllegalStateException("해당 매장에 속한 멤버가 아닙니다."));
+
+        // 고정 근무자는 희망 근무 시간 등록 불가
+        if (cm.isFixedShiftWorker()) {
+            throw new IllegalStateException("고정 근무자는 희망 근무 시간을 별도로 등록할 수 없습니다.");
+        }
+
+        Member member = cm.getMember();
+
+        // 기존 패턴 전체 삭제
+        memberAvailabilityRepository.deleteByCompanyIdAndMemberId(companyId, member.getId());
+
+        // 요청이 비어 있으면 "전부 삭제" 상태로 종료
+        if (req.getItems() == null || req.getItems().isEmpty()) {
+            return;
+        }
+
+        // 새 패턴 생성
+        List<MemberAvailability> created = new ArrayList<>();
+        for (MemberAvailabilityItemRequest item : req.getItems()) {
+
+            // dow 범위 추가 검증 (0~6)
+            if (item.getDow() < 0 || item.getDow() > 6) {
+                throw new IllegalArgumentException("dow 값은 0(월) ~ 6(일) 이어야 합니다.");
+            }
+
+            MemberAvailability avail = MemberAvailability.create(
+                    company,
+                    member,
+                    item.getDow(),
+                    item.getStartTime(),
+                    item.getEndTime(),
+                    item.getEffectiveFrom(),
+                    item.getEffectiveTo()
+            );
+
+            created.add(avail);
+        }
+
+        memberAvailabilityRepository.saveAll(created);
+    }
+
+    /**
+     * 근무자 희망 근무 시간 조회
+     */
+    public MemberAvailabilityResponse getMemberAvailabilityPattern(UUID memberId, UUID companyId) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Company not found"));
+
+        CompanyMember cm = companyMemberRepository.findByCompanyIdAndMemberId(companyId, memberId)
+                .orElseThrow(() -> new IllegalStateException("해당 매장에 속한 멤버가 아닙니다."));
+
+        if (cm.isFixedShiftWorker()) {
+            throw new IllegalStateException("고정 근무자는 희망 근무 시간 패턴을 별도로 사용하지 않습니다.");
+        }
+
+        Member member = cm.getMember();
+
+        List<MemberAvailability> list = memberAvailabilityRepository.findByCompanyIdAndMemberId(companyId, member.getId());
+
+        List<MemberAvailabilityItemResponse> items = list.stream()
+                .map(MemberAvailabilityItemResponse::from)
+                .toList();
+
+        return MemberAvailabilityResponse.builder()
+                .memberId(member.getId())
+                .companyId(companyId)
+                .memberName(member.getName())
+                .items(items)
+                .build();
+    }
+
+    /**
      * 고정 근무자 설정 및 고정 근무 패턴 등록(갱신)
      */
     @Transactional
