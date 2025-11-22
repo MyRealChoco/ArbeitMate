@@ -234,7 +234,7 @@ public class ScheduleController {
     /**
      * 수동 편성 반영
      */
-    @PutMapping("/{periodId}/assignments")
+    @PostMapping("/{periodId}/assignments")
     public ResponseEntity<List<ScheduleAssignmentSlotResponse>> updateScheduleAssignments(
             @AuthenticationPrincipal AuthPrincipal principal,
             @PathVariable UUID companyId,
