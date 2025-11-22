@@ -19,4 +19,10 @@ public interface ScheduleSlotAvailabilityRepository extends JpaRepository<Schedu
     @Query("delete from ScheduleSlotAvailability a " +
             "where a.member.id = :memberId and a.schedule.period = :period")
     void deleteByMemberAndPeriod(@Param("memberId") UUID memberId, @Param("period") SchedulePeriod period);
+
+    @Query("""
+           select a from ScheduleSlotAvailability a
+           where a.schedule.period = :period
+           """)
+    List<ScheduleSlotAvailability> findByPeriod(@Param("period") SchedulePeriod period);
 }

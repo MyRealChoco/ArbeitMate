@@ -1,6 +1,7 @@
 package OpenSourceSW.ArbeitMate.service;
 
 import OpenSourceSW.ArbeitMate.domain.*;
+import OpenSourceSW.ArbeitMate.domain.enums.AssignmentStatus;
 import OpenSourceSW.ArbeitMate.domain.enums.MembershipRole;
 import OpenSourceSW.ArbeitMate.domain.enums.PeriodStatus;
 import OpenSourceSW.ArbeitMate.domain.enums.PeriodType;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
 import java.time.temporal.WeekFields;
 import java.util.*;
@@ -866,6 +868,332 @@ public class ScheduleService {
                 }).toList();
     }
 
+    /**
+     * 고정 근무자 선 배치
+     */
+    private void applyFixedShiftsToSchedules(Company company, SchedulePeriod period, List<Schedule> schedules) {
+        // 1. 기간 내 활성 고정 근무 패턴 조회
+        List<FixedShift> fixedShifts = fixedShiftRepository.findActiveInPeriod(company.getId(), period.getStartDate(), period.getEndDate());
+
+        if (fixedShifts.isEmpty()) return;
+
+        // 2. (date, role, time range) -> 고정 근무자 목록 집계
+        Map<SlotKey, List<Member>> fixedMap = new LinkedHashMap<>();
+
+        LocalDate date = period.getStartDate();
+        while (!date.isAfter(period.getEndDate())) {
+            int dow = date.getDayOfWeek().getValue() - 1; // 0=월..6=일
+
+            for (FixedShift fs : fixedShifts) {
+                if (fs.getDow() != dow) continue;
+                if (!isFixedShiftEffectiveOn(fs, date)) continue;
+
+                SlotKey key = new SlotKey(
+                        date,
+                        fs.getRole().getId(),
+                        fs.getStartTime(),
+                        fs.getEndTime()
+                );
+
+                fixedMap.computeIfAbsent(key, k -> new ArrayList<>())
+                        .add(fs.getMember());
+            }
+
+            date = date.plusDays(1);
+        }
+
+        if (fixedMap.isEmpty()) return;
+
+        // 3. 기존 스케쥴을 (date, role, time range) 기준으로 매핑
+        Map<SlotKey, Schedule> slotMap = schedules.stream()
+                .collect(Collectors.toMap(
+                        s -> new SlotKey(
+                                s.getWorkDate(),
+                                s.getRole().getId(),
+                                s.getStartTime(),
+                                s.getEndTime()
+                        ),
+                        s -> s,
+                        (a, b) -> a,
+                        LinkedHashMap::new
+                ));
+
+        // 4. 고정 근무자 패턴별로 Slot 확보 + Assignment 생성
+        for (Map.Entry<SlotKey, List<Member>> entry : fixedMap.entrySet()) {
+            SlotKey key = entry.getKey();
+            List<Member> fixedMembers = entry.getValue();
+            int fixedCount = fixedMembers.size();
+
+            // 해당 키에 맞는 Slot이 이미 있으면 재사용, 없으면 생성
+            Schedule s = slotMap.get(key);
+            if (s == null) {
+                CompanyRole role = companyRoleRepository.findById(key.roleId())
+                        .orElseThrow(() -> new IllegalStateException("고정 근무자 역할 정보를 찾을 수 없습니다."));
+
+                // requiredHeadcount는 "최소" 고정 근무자 수만큼 설정
+                int requiredHeadcount = Math.max(1, fixedMembers.size());
+
+                s = Schedule.create(
+                        company,
+                        period,
+                        role,
+                        key.date(),
+                        key.start(),
+                        key.end(),
+                        requiredHeadcount
+                );
+
+                schedules.add(s);
+                slotMap.put(key, s);
+            } else {
+                s.ensureRequiredHeadcountAtLeast(fixedCount); // 기존 Slot 이 있더라도, 정원이 고정 근무자 수보다 적으면 고정 근무자 수까지 올려주기
+            }
+
+            // 이 Slot에 고정 근무자 Assignment 생성 (중복 방지, 정원 신경 쓰지 않고 무조건 넣음)
+            for (Member m : fixedMembers) {
+                boolean already = s.getAssignments().stream()
+                        .anyMatch(a -> a.getStatus() == AssignmentStatus.ASSIGNED && a.getMember().getId().equals(m.getId()));
+
+                if (!already) {
+                    ScheduleAssignment.create(s, m);
+                }
+            }
+        }
+    }
+
+    private boolean isFixedShiftEffectiveOn(FixedShift fs, LocalDate date) {
+        if (date.isBefore(fs.getEffectiveFrom())) return false;
+        if (fs.getEffectiveTo() != null && date.isAfter(fs.getEffectiveTo())) return false;
+        return true;
+    }
+
+    /**
+     * 스케쥴 자동 배치
+     */
+    @Transactional
+    public List<ScheduleAssignmentSlotResponse> autoAssignSchedules(UUID ownerId, UUID companyId, UUID periodId) {
+        // 1. 회사 + owner 검증
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Company not found"));
+        validateOwner(ownerId, company);
+
+        // 2. 기간 검증
+        SchedulePeriod period = schedulePeriodRepository.findById(periodId)
+                .orElseThrow(() -> new IllegalArgumentException("SchedulePeriod not found"));
+
+        if (!period.getCompany().getId().equals(companyId)) {
+            throw new IllegalStateException("해당 매장의 스케쥴 기간이 아닙니다.");
+        }
+        if (period.getStatus() != PeriodStatus.DRAFT) {
+            throw new IllegalStateException("DRAFT 상태의 기간에서만 자동 배치를 수행할 수 있습니다.");
+        }
+
+        // 3. 기간의 모든 슬롯 로드
+        List<Schedule> schedules = new ArrayList<>(scheduleRepository.findByPeriod(period));
+
+        // 기존 배정된 자동 스케쥴 제거
+        for (Schedule s : schedules) {
+            s.getAssignments().clear();
+        }
+
+        // 고정 근무자 배치
+        applyFixedShiftsToSchedules(company, period, schedules);
+
+        // 4. 이 매장의 WORKER 중 고정근무자가 아닌 사람들
+        List<CompanyMember> workers = companyMemberRepository.findByCompanyIdAndRole(companyId, MembershipRole.WORKER);
+
+        List<CompanyMember> targetWorkers = workers.stream()
+                .filter(cm -> !cm.isFixedShiftWorker())
+                .toList();
+
+        if (targetWorkers.isEmpty()) {
+            // 고정 근무자만 있는 경우 return
+            return schedules.stream()
+                    .map(ScheduleAssignmentSlotResponse::from)
+                    .toList();
+        }
+
+        // MemberId -> CompanyMember 매핑
+        Map<UUID, CompanyMember> cmByMemberId = targetWorkers.stream()
+                .collect(Collectors.toMap(cm -> cm.getMember().getId(), cm -> cm));
+
+        // 5. 기간 내 모든 ScheduleSlotAvailability 조회 후 scheduleId 기준 그룹핑
+        List<ScheduleSlotAvailability> allAvail = scheduleSlotAvailabilityRepository.findByPeriod(period);
+
+        Map<UUID, List<ScheduleSlotAvailability>> availByScheduleId = allAvail.stream()
+                .filter(ScheduleSlotAvailability::isWilling)
+                .collect(Collectors.groupingBy(a -> a.getSchedule().getId()));
+
+        // 6. memberId -> 가능한 roleId Set 캐시
+        Map<UUID, Set<UUID>> roleCache = new HashMap<>();
+
+        Random random = new Random();
+
+        // 7. 각 슬롯에 대해 배치 수행
+        for (Schedule s : schedules) {
+
+            // 이미 ASSIGNED 상태로 배정된 인원 수
+            long alreadyAssigned = s.getAssignments().stream()
+                    .filter(a -> a.getStatus() == AssignmentStatus.ASSIGNED)
+                    .count();
+
+            int remaining = s.getRequiredHeadcount() - (int) alreadyAssigned;
+            if (remaining <= 0) continue;
+
+            List<ScheduleSlotAvailability> availForSlot =
+                    availByScheduleId.getOrDefault(s.getId(), List.of());
+
+            // 이 슬롯에서 "가능" 표시한 사람들 중, 회사에 속해 있고, fixed가 아니며, 역할 가능 여부 만족하는 멤버들
+            List<Member> candidates = availForSlot.stream()
+                    .map(a -> {
+                        UUID memberId = a.getMember().getId();
+                        CompanyMember cm = cmByMemberId.get(memberId);
+                        return (cm != null) ? cm : null;
+                    })
+                    .filter(Objects::nonNull)
+                    .filter(cm -> canWorkRole(companyId, cm.getMember(), s.getRole().getId(), roleCache))
+                    // 같은 슬롯에 중복 배치 방지
+                    .filter(cm -> s.getAssignments().stream()
+                            .noneMatch(asg -> asg.getMember().getId().equals(cm.getMember().getId())))
+                    .map(CompanyMember::getMember)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            if (candidates.isEmpty()) continue;
+
+            // 랜덤 순서 섞기
+            Collections.shuffle(candidates, random);
+
+            int toAssign = Math.min(remaining, candidates.size());
+            for (int i = 0; i < toAssign; i++) {
+                Member m = candidates.get(i);
+                ScheduleAssignment.create(s, m); // Assignment는 Member 기준
+            }
+        }
+
+        // 8. 최종 배치 결과 반환
+        return schedules.stream()
+                .map(ScheduleAssignmentSlotResponse::from)
+                .toList();
+    }
+
+    /**
+     * 스케쥴 수동 편집 후 최종 편성안 반영
+     */
+    @Transactional
+    public List<ScheduleAssignmentSlotResponse> updateScheduleAssignments(UUID ownerId, UUID companyId, UUID periodId, UpdateScheduleAssignmentsRequest req) {
+
+        // 회사 + owner 검증
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Company not found"));
+        validateOwner(ownerId, company);
+
+        // 기간 검증
+        SchedulePeriod period = schedulePeriodRepository.findById(periodId)
+                .orElseThrow(() -> new IllegalArgumentException("SchedulePeriod not found"));
+
+        if (!period.getCompany().getId().equals(companyId)) {
+            throw new IllegalStateException("해당 매장의 스케쥴 기간이 아닙니다.");
+        }
+        if (period.getStatus() != PeriodStatus.DRAFT) {
+            throw new IllegalStateException("DRAFT 상태의 기간에서만 편성안을 수정할 수 있습니다.");
+        }
+
+        // 기간의 모든 슬롯 로드
+        List<Schedule> schedules = scheduleRepository.findByPeriod(period);
+        if (schedules.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, Schedule> scheduleMap = schedules.stream()
+                .collect(Collectors.toMap(Schedule::getId, s -> s));
+
+        // 기존 Assignment 전체 제거
+        for (Schedule s : schedules) {
+            s.getAssignments().clear();
+        }
+
+        // 요청에 등장하는 전체 memberId 목록
+        List<UUID> allMemberIds = req.getItems().stream()
+                .flatMap(item -> item.getMemberIds().stream())
+                .distinct()
+                .toList();
+
+        // memberId -> CompanyMember 매핑 (회사 소속 + WORKER + fixed가 아닌지 검증)
+        Map<UUID, CompanyMember> cmMap = new HashMap<>();
+        for (UUID memberId : allMemberIds) {
+            CompanyMember cm = companyMemberRepository
+                    .findByCompanyIdAndMemberId(companyId, memberId)
+                    .orElseThrow(() -> new IllegalStateException("해당 매장에 속한 멤버가 아닙니다. memberId=" + memberId));
+
+            if (cm.getRole() != MembershipRole.WORKER) {
+                throw new IllegalStateException("WORKER가 아닌 멤버는 배치할 수 없습니다. memberId=" + memberId);
+            }
+            if (cm.isFixedShiftWorker()) {
+                throw new IllegalStateException("고정 근무자는 자동 배치/수동 배치 대상이 아닙니다. memberId=" + memberId);
+            }
+
+            cmMap.put(memberId, cm);
+        }
+
+        // 역할 가능 여부 캐시
+        Map<UUID, Set<UUID>> roleCache = new HashMap<>();
+
+        // 요청에 따라 배치 생성
+        for (UpdateScheduleAssignmentsRequest.Item item : req.getItems()) {
+            Schedule s = scheduleMap.get(item.getScheduleId());
+            if (s == null) {
+                throw new IllegalStateException("해당 기간의 스케쥴이 아닙니다: " + item.getScheduleId());
+            }
+
+            if (item.getMemberIds().size() > s.getRequiredHeadcount()) {
+                throw new IllegalArgumentException("필요 인원보다 많은 인원이 배치되었습니다. scheduleId=" + s.getId());
+            }
+
+            for (UUID memberId : item.getMemberIds()) {
+                CompanyMember cm = cmMap.get(memberId);
+                if (cm == null) {
+                    throw new IllegalStateException("요청에 포함된 member가 회사에 속해있지 않습니다. memberId=" + memberId);
+                }
+
+                Member member = cm.getMember();
+
+                // 역할 가능 여부 체크
+                if (!canWorkRole(companyId, member, s.getRole().getId(), roleCache)) {
+                    throw new IllegalStateException("해당 역할을 수행할 수 없는 멤버가 포함되어 있습니다. memberId=" + memberId);
+                }
+
+                // 실제 Assignment 생성 (Member 기준)
+                ScheduleAssignment.create(s, member);
+            }
+        }
+
+        // 최종 상태 반환
+        return schedules.stream()
+                .map(ScheduleAssignmentSlotResponse::from)
+                .toList();
+    }
+
+    /**
+     * 근무표 확정 메서드
+     */
+    @Transactional
+    public void publishSchedulePeriod(UUID ownerId, UUID companyId, UUID periodId) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Company not found"));
+        validateOwner(ownerId, company);
+
+        SchedulePeriod period = schedulePeriodRepository.findById(periodId)
+                .orElseThrow(() -> new IllegalArgumentException("SchedulePeriod not found"));
+
+        if (!period.getCompany().getId().equals(companyId)) {
+            throw new IllegalStateException("해당 매장의 스케쥴 기간이 아닙니다.");
+        }
+        if (period.getStatus() != PeriodStatus.DRAFT) {
+            throw new IllegalStateException("이미 게시되었거나 게시할 수 없는 상태입니다.");
+        }
+
+        period.publish(company.getOwner());
+    }
 
     ///  고정 근무자 dto 생성 관련 로직
     private FixedShiftResponse buildFixedShiftResponse(CompanyMember cm, boolean fixed, List<FixedShiftItemResponse> items) {
@@ -945,4 +1273,16 @@ public class ScheduleService {
             throw new IllegalStateException("해당 기간에 이미 다른 스케줄 기간이 존재합니다.");
         }
     }
+    // member가 해당 roleId 역할을 수행할 수 있는지 여부 확인
+    private boolean canWorkRole(UUID companyId, Member member, UUID roleId, Map<UUID, Set<UUID>> cache) {
+        Set<UUID> roleIds = cache.computeIfAbsent(member.getId(), mid -> {
+            var cmrs = companyMemberRoleRepository.findByCompanyIdAndMemberId(companyId, mid);
+            return cmrs.stream()
+                    .map(cmr -> cmr.getRole().getId())
+                    .collect(Collectors.toSet());
+        });
+        return roleIds.contains(roleId);
+    }
+
+    private record SlotKey(LocalDate date, UUID roleId, LocalTime start, LocalTime end) {}
 }
