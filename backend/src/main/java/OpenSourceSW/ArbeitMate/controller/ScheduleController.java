@@ -25,6 +25,19 @@ public class ScheduleController {
     private final ScheduleService scheduleService;
 
     /**
+     * 커스텀 스케쥴 기간 생성 (시작일/종료일)
+     */
+    @PostMapping("/create/custom")
+    public ResponseEntity<SchedulePeriodResponse> createCustomSchedule(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable UUID companyId,
+            @Valid @RequestBody CreatePeriodRequest req) {
+
+        var res = scheduleService.createPeriod(principal.memberId(), companyId, req);
+        return ResponseEntity.ok(res);
+    }
+
+    /**
      * 주간 스케쥴 기간 생성
      */
     @PostMapping("/create/weekly")
