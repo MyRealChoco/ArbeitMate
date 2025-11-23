@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.time.temporal.WeekFields;
 import java.util.*;
@@ -41,6 +42,45 @@ public class ScheduleService {
     private final ScheduleSlotAvailabilityRepository scheduleSlotAvailabilityRepository;
     private final AvailabilitySubmissionRepository availabilitySubmissionRepository;
 
+    /**
+     * 스케쥴 기간 생성 (시작일 / 종료일)
+     */
+    @Transactional
+    public SchedulePeriodResponse createPeriod(UUID ownerId, UUID companyId, CreatePeriodRequest req) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new IllegalArgumentException("Company not found"));
+
+        validateOwner(ownerId, company);
+
+        LocalDate start = req.getStartDate();
+        LocalDate end = req.getEndDate();
+
+        if(end.isBefore(start)) {
+            throw new IllegalArgumentException("종료일은 시작일보다 앞설 수 없습니다.");
+        }
+
+        long days = ChronoUnit.DAYS.between(start, end) + 1;
+        if(days<7) {
+            throw new IllegalArgumentException("스케쥴 기간은 최소 7일 이상이어야 합니다.");
+        }
+
+        validateNoPeriodOverlap(companyId, start, end);
+
+        String name = normalizeNameOrGenerateCustom(companyId, start, end, req.getName());
+
+        SchedulePeriod period = SchedulePeriod.create(
+                company,
+                name,
+                PeriodType.CUSTOM,
+                start,
+                end,
+                req.getAvailabilityDueAt()
+        );
+
+        schedulePeriodRepository.save(period);
+
+        return SchedulePeriodResponse.from(period);
+    }
     /**
      * 주간 스케쥴 기간 생성
      */
@@ -1241,6 +1281,14 @@ public class ScheduleService {
         }
         return name;
     }
+    private String normalizeNameOrGenerateCustom(UUID companyId, LocalDate start, LocalDate end, String rawName) {
+        String name = (rawName != null && !rawName.isBlank()) ? rawName.trim() : generateCustomName(start, end);
+
+        if (schedulePeriodRepository.existsByCompanyIdAndName(companyId, name)) {
+            throw new IllegalStateException("이미 동일한 이름의 기간이 존재합니다.");
+        }
+        return name;
+    }
 
     private String generateWeeklyName(LocalDate start) {
         WeekFields wf = WeekFields.of(Locale.KOREA);
@@ -1251,6 +1299,9 @@ public class ScheduleService {
         int year = start.getYear();
         int month = start.getMonthValue();
         return String.format("%04d-%02d", year, month); // ex) 2025-11
+    }
+    private String generateCustomName(LocalDate start, LocalDate end) {
+        return String.format("%s_to_%s", start, end); // ex) 2025-11-17_to_2025-11-23
     }
 
     private String generateTemplateNameFromPeriod(UUID companyId, SchedulePeriod period) {
