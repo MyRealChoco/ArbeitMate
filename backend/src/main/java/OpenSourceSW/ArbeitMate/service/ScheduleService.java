@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.time.temporal.WeekFields;
 import java.util.*;
@@ -56,6 +57,11 @@ public class ScheduleService {
 
         if(end.isBefore(start)) {
             throw new IllegalArgumentException("종료일은 시작일보다 앞설 수 없습니다.");
+        }
+
+        long days = ChronoUnit.DAYS.between(start, end) + 1;
+        if(days<7) {
+            throw new IllegalArgumentException("스케쥴 기간은 최소 7일 이상이어야 합니다.");
         }
 
         validateNoPeriodOverlap(companyId, start, end);
