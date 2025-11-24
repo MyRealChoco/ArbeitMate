@@ -1,16 +1,14 @@
 package OpenSourceSW.ArbeitMate.controller;
 
-import OpenSourceSW.ArbeitMate.dto.MemberLoginRequest;
-import OpenSourceSW.ArbeitMate.dto.MemberSignUpRequest;
+import OpenSourceSW.ArbeitMate.dto.request.UpdateNameRequest;
+import OpenSourceSW.ArbeitMate.dto.response.MemberResponse;
+import OpenSourceSW.ArbeitMate.security.AuthPrincipal;
 import OpenSourceSW.ArbeitMate.service.MemberService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.util.UUID;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/members")
@@ -19,18 +17,25 @@ public class MemberController {
 
     private final MemberService memberService;
 
-    @PostMapping("/signup")
-    public ResponseEntity<String> signUp(@RequestBody MemberSignUpRequest request) {
-
-        UUID memberId = memberService.signUp(request);
-
-        return ResponseEntity.ok("회원가입 성공. 회원 ID: " + memberId);
+    /**
+     * 현재 로그인한 사용자 프로필 조회
+     */
+    @GetMapping("/me")
+    public ResponseEntity<MemberResponse> me(@AuthenticationPrincipal AuthPrincipal principal) {
+        var res = memberService.getProfile(principal.memberId());
+        return ResponseEntity.ok(res);
     }
-    @PostMapping("/login")
-    public ResponseEntity<String> login(@RequestBody MemberLoginRequest request) {
 
-        UUID memberId = memberService.login(request);
-
-        return ResponseEntity.ok("로그인 성공. 회원 ID: " + memberId);
+    /**
+     * 이름 수정
+     */
+    @PatchMapping("/me")
+    public ResponseEntity<MemberResponse> updateMe(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @RequestBody @Valid UpdateNameRequest req
+    ) {
+        var res = memberService.updateName(principal.memberId(), req.getName());
+        return ResponseEntity.ok(res);
     }
+
 }
