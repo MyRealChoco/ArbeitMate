@@ -6,53 +6,45 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  Alert,
 } from "react-native";
 import { ArrowLeft } from "lucide-react-native";
+import client from "../services/api";
 
-export default function WorkplaceAddScreen({ navigation , setRole }) {
-  const handleCreate = () => {
-    // 근무지 생성 로직 (DB 저장 등)dss
-    setRole("employer");    // 역할 확정
-  };
+export default function WorkplaceAddScreen({ navigation }) {
+
   const [storeName, setStoreName] = useState("");
   const [address, setAddress] = useState("");
   const [category, setCategory] = useState("");
   const [phone, setPhone] = useState("");
 
   const handleRegister = async () => {
-    if (!name || !address || !businessType || !phone) {
-      Alert.alert("입력 오류", "모든 항목을 입력해주세요.");
+    if (!storeName.trim() || !address.trim()) {
+      Alert.alert("입력 오류", "매장명과 주소는 필수 입력 사항입니다.");
       return;
     }
 
     try {
-      const res = await fetch("http://..../company", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: storeName,
-          address: address,
-          businessType: category,
-          phone: phone,
-        }),
+      await client.post("/companies/create", {
+        companyName: storeName,
+        companyAddress: address,
+        //category, phone은 아직 백엔드에서 받지 않음
+        //업데이트 후 추가
       });
 
-      if (!res.ok) {
-        Alert.alert("등록 실패", "서버 오류가 발생했습니다.");
-        return;
-      }
-
-      const data = await res.json();
-
-      Alert.alert("등록 완료", "근무지가 등록되었습니다.");
-
-      // 등록 후 근무지 선택 화면으로 이동
-      // 그리고 새로고침(재조회)을 위해 파라미터 전달
-      navigation.navigate("WorkplaceSelectScreen", { refresh: true });
+      Alert.alert("생성 완료", "새로운 근무지가 등록되었습니다.", [
+        {
+          text: "확인",
+          onPress: () => {
+            // 목록 화면으로 돌아가면서 새로고침 신호 보내기
+            navigation.navigate("WorkplaceSelectScreen", { refresh: true });
+          },
+        },
+      ]);
 
     } catch (err) {
       console.log(err);
-      Alert.alert("오류", "서버와 연결할 수 없습니다.");
+      Alert.alert("생성 실패", "오류가 발생했습니다. 다시 시도해주세요.");
     }
   };
 
@@ -122,8 +114,7 @@ export default function WorkplaceAddScreen({ navigation , setRole }) {
       </ScrollView>
 
       {/* 등록 버튼 */}
-      <TouchableOpacity style={styles.submitButton}
-      onPress={() => navigation.navigate("WorkplaceSelectScreen")}>
+      <TouchableOpacity style={styles.submitButton} onPress={handleRegister}>
         <Text style={styles.submitText}>등록</Text>
       </TouchableOpacity>
 
