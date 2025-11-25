@@ -1267,6 +1267,7 @@ public class ScheduleService {
         );
 
         return schedules.stream()
+                .filter(s -> s.getPeriod().getStatus() == PeriodStatus.PUBLISHED)
                 .map(ScheduleSlotResponse::from)
                 .toList();
     }
