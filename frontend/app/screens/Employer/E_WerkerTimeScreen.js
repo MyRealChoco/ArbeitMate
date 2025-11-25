@@ -7,8 +7,22 @@ import {
     ScrollView,
 } from "react-native";
 import { ArrowLeft, Plus, ChevronRight } from "lucide-react-native";
+import axios from "axios";
+
+const BASE_URL = "http://<백엔드-서버-IP>:8080";
 
 export default function E_WerkerTimeScreen({ navigation }) {
+    const { workerId } = route.params;
+    const [fixedTimes, setFixedTimes] = useState([]);
+
+    useEffect(() => {
+        loadTimes();
+    }, []);
+
+    const loadTimes = async () => {
+        const res = await axios.get(`${BASE_URL}/worker/${workerId}/fixed-times`);
+        setFixedTimes(res.data);
+    };
     return (
         <View style={styles.container}>
 

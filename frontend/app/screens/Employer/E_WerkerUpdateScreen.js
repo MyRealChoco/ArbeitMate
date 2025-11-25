@@ -1,8 +1,38 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import { ArrowLeft } from "lucide-react-native";
+import axios from "axios";
+
+const BASE_URL = "http://<백엔드-서버-IP>:8080";
 
 export default function E_WerkerUpdateScreen({ navigation }) {
+     const { workerId } = route.params;
+  const [worker, setWorker] = useState(null);
+
+  useEffect(() => {
+    loadWorker();
+  }, []);
+
+  const loadWorker = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}/worker/${workerId}`);
+      setWorker(res.data);
+    } catch (err) {
+      console.log("근무자 상세 정보 오류:", err);
+    }
+  };
+
+  const saveWorker = async () => {
+    try {
+      await axios.put(`${BASE_URL}/worker/${workerId}`, worker);
+      alert("저장되었습니다.");
+      navigation.goBack();
+    } catch (err) {
+      console.log("근무자 정보 저장 오류:", err);
+    }
+  };
+
+  if (!worker) return <ActivityIndicator size="large" style={{ marginTop: 100 }} />;
   return (
     <View style={styles.container}>
 

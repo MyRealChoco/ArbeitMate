@@ -1,8 +1,30 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { ArrowLeft, ChevronRight } from "lucide-react-native";
+import axios from "axios";
+
+const BASE_URL = "http://<백엔드-서버-IP>:8080";
 
 export default function WorkerManageScreen({ navigation }) {
+    const [workers, setWorkers] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        loadWorkers();
+    }, []);
+
+    const loadWorkers = async () => {
+        try {
+            const res = await axios.get(`.../workers`);
+            setWorkers(res.data);
+        } catch (err) {
+            console.log("근무자 목록 불러오기 오류:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (loading) return <ActivityIndicator size="large" style={{ marginTop: 100 }} />;
     return (
         <View style={styles.container}>
 

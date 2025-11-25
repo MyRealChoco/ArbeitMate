@@ -14,26 +14,26 @@ export default function AddPeopleModal({ visible, onClose }) {
   const [count, setCount] = useState(0);
 
   async function savePeople() {
-  try {
-    await axios.post(`.../api/schedules/people`, {
-      day,
-      task,
-      time,
-      needPeople: count
-    });
+    try {
+      await axios.post(`${BASE_URL}/api/schedules/people`, {
+        day,
+        task,
+        time,
+        needPeople: count
+      });
 
-    onClose();
-  } catch (e) {
-    console.log(e);
+      onClose();
+    } catch (e) {
+      console.log(e);
+    }
   }
-}
 
   return (
     <Modal visible={visible} transparent animationType="fade">
 
       {/* 배경 */}
       <View style={styles.dimmed}>
-        
+
         {/* 팝업 박스 */}
         <View style={styles.modalBox}>
 
