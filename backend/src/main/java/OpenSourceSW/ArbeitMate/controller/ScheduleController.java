@@ -270,4 +270,15 @@ public class ScheduleController {
         scheduleService.publishSchedulePeriod(principal.memberId(), companyId, periodId);
         return new ResponseEntity<>(HttpStatus.OK);
     }
+
+    // 월 근무표 조회
+    @GetMapping("/monthly")
+    public ResponseEntity<List<ScheduleSlotResponse>> getMonthlySchedules(
+            @PathVariable UUID companyId,
+            @RequestParam int year,
+            @RequestParam int month
+    ) {
+         var res = scheduleService.getMonthlySchedules(companyId, year, month);
+        return ResponseEntity.ok(res);
+    }
 }

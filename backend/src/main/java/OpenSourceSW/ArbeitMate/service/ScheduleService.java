@@ -1253,6 +1253,24 @@ public class ScheduleService {
         period.publish(company.getOwner());
     }
 
+    /**
+     * 근무표 조회
+     */
+    public List<ScheduleSlotResponse> getMonthlySchedules(UUID companyId, int year, int month) {
+        // 시작일 말일 계산
+        java.time.YearMonth yearMonth = java.time.YearMonth.of(year, month);
+        LocalDate startDate = yearMonth.atDay(1);
+        LocalDate endDate = yearMonth.atEndOfMonth();
+
+        List<Schedule> schedules = scheduleRepository.findByCompanyIdAndWorkDateBetween(
+                companyId, startDate, endDate
+        );
+
+        return schedules.stream()
+                .map(ScheduleSlotResponse::from)
+                .toList();
+    }
+
     ///  고정 근무자 dto 생성 관련 로직
     private FixedShiftResponse buildFixedShiftResponse(CompanyMember cm, boolean fixed, List<FixedShiftItemResponse> items) {
         return FixedShiftResponse.builder()
