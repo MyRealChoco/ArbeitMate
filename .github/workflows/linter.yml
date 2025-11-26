@@ -27,6 +27,3 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
           VALIDATE_JAVA: true
-          # XML, YAML 등 다른 파일도 검사하고 싶으면 true로 변경
-          VALIDATE_XML: false
-          VALIDATE_YAML: false
