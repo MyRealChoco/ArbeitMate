@@ -14,6 +14,7 @@ import java.util.UUID;
 public interface ScheduleRepository extends JpaRepository<Schedule, UUID> {
     List<Schedule> findByCompanyIdAndWorkDateBetween(UUID companyId, LocalDate from, LocalDate to);
     List<Schedule> findByPeriod(SchedulePeriod period);
+    List<Schedule> findByCompanyIdAndWorkDateBetweenOrderByWorkDateAscStartTimeAsc(UUID companyId, LocalDate from, LocalDate to);
     @Modifying
     @Query("delete from Schedule s where s.period.id = :periodId")
     void deleteByPeriodId(@Param("periodId") UUID periodId);
