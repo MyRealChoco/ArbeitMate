@@ -8,7 +8,7 @@ import {
   RefreshControl,
   Alert
 } from "react-native";
-import { ArrowLeft, Trash2, ChevronRight } from "lucide-react-native"; 
+import { ArrowLeft, Trash2, ChevronRight, CheckCircle } from "lucide-react-native"; 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import client from "../../services/api";
@@ -34,11 +34,25 @@ export default function W_ScheduleCheckScreen({ navigation }) {
       setRequests(opens);
 
       // 1. 패턴 데이터 처리
-      const sortedPatterns = (patternRes.data.items || []).sort((a, b) => {
+      const rawItems = patternRes.data.items || [];
+      const sortedPatterns = rawItems.sort((a, b) => {
         if (a.dow !== b.dow) return a.dow - b.dow;
         return a.startTime.localeCompare(b.startTime);
       });
-      setPatterns(sortedPatterns);
+
+      // 같은 요일/시간대가 서버에서 중복으로 내려오는 경우가 있어도
+      // 화면에는 한 번만 보이도록 클라이언트에서 dedupe
+      const uniquePatterns = [];
+      const seen = new Set();
+      sortedPatterns.forEach((p) => {
+        const key = `${p.dow}-${p.startTime}-${p.endTime}-${p.effectiveFrom}-${p.effectiveTo}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniquePatterns.push(p);
+        }
+      });
+
+      setPatterns(uniquePatterns);
       
     } catch (err) {
       console.log("데이터 로딩 실패:", err);
@@ -161,8 +175,7 @@ export default function W_ScheduleCheckScreen({ navigation }) {
                       {/* 제출 완료 여부 표시 (데이터에 submitted 필드가 있다면) */}
                       {req.submitted && (
                         <View style={styles.submittedBadge}>
-                          <CheckCircle size={14} color="#15803d" />
-                          <Text style={styles.submittedText}>제출됨</Text>
+                          <CheckCircle size={20} color="#15803d" />
                         </View>
                       )}
                     </View>

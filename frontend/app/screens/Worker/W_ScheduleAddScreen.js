@@ -41,7 +41,18 @@ export default function W_ScheduleAddScreen({ navigation }) {
       if (!companyId) return;
       // 서버에서 최신 데이터를 가져와서 existingPatterns를 갱신함
       const res = await client.get(`/companies/${companyId}/schedule/worker/availability-pattern`);
-      setExistingPatterns(res.data.items || []);
+      const items = res.data.items || [];
+      // 같은 요일/시간대가 중복으로 들어오는 경우를 방지하기 위해 클라이언트에서 한 번 더 dedupe
+      const uniqueItems = [];
+      const seen = new Set();
+      items.forEach((p) => {
+        const key = `${p.dow}-${p.startTime}-${p.endTime}-${p.effectiveFrom}-${p.effectiveTo}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueItems.push(p);
+        }
+      });
+      setExistingPatterns(uniqueItems);
     } catch (e) {
       console.log("기존 패턴 로드 실패:", e);
     }
@@ -73,7 +84,18 @@ export default function W_ScheduleAddScreen({ navigation }) {
 
     try {
       const companyId = await AsyncStorage.getItem("currentCompanyId");
-      
+      if (!companyId) return;
+
+      // 저장 직전에 서버에서 최신 패턴을 다시 가져와서, 항상 최신 상태 기준으로 계산
+      const latestRes = await client.get(`/companies/${companyId}/schedule/worker/availability-pattern`);
+      const latestItems = (latestRes.data.items || []).map(p => ({
+        dow: p.dow,
+        startTime: p.startTime,
+        endTime: p.endTime,
+        effectiveFrom: p.effectiveFrom,
+        effectiveTo: p.effectiveTo
+      }));
+
       // 1. 이번에 새로 추가/수정할 데이터 생성
       const newItems = selectedDays.map(day => ({
         dow: day,
@@ -83,20 +105,27 @@ export default function W_ScheduleAddScreen({ navigation }) {
         effectiveTo: null
       }));
 
-      // [수정 2] 기존 데이터 중, 이번에 선택한 요일(selectedDays)과 겹치는 건 제거(filter)
-      // 예: 기존에 '화'가 있어도, 이번에 '화'를 다시 설정하면 기존 것을 빼고 새 것을 넣어야 함
-      const filteredExisting = existingPatterns.filter(
+      // 최신 서버 상태(latestItems) 기준으로,
+      // 이번에 선택한 요일(selectedDays)과 겹치는 기존 패턴 제거
+      const filteredExisting = latestItems.filter(
         p => !selectedDays.includes(p.dow)
-      ).map(p => ({
-        dow: p.dow,
-        startTime: p.startTime,
-        endTime: p.endTime,
-        effectiveFrom: p.effectiveFrom,
-        effectiveTo: p.effectiveTo
-      }));
+      );
 
       // 필터링된 기존 데이터 + 새로운 데이터 합치기
-      const combined = [...filteredExisting, ...newItems];
+      let combined = [...filteredExisting, ...newItems];
+
+      // 혹시 서버에서 중복 데이터가 내려와 combined 안에 같은 패턴이 여러 개 섞여 있을 수 있으므로
+      // POST 전에 한 번 더 dedupe 해서 요일/시간대 조합이 하나씩만 가도록 보정
+      const deduped = [];
+      const seen = new Set();
+      combined.forEach((p) => {
+        const key = `${p.dow}-${p.startTime}-${p.endTime}-${p.effectiveFrom}-${p.effectiveTo}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          deduped.push(p);
+        }
+      });
+      combined = deduped;
 
       await client.post(`/companies/${companyId}/schedule/worker/availability-pattern`, {
         items: combined
