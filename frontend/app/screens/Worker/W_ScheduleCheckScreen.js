@@ -15,7 +15,8 @@ import client from "../../services/api";
 
 export default function W_ScheduleCheckScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
-  const [patterns, setPatterns] = useState([]); 
+  const [patterns, setPatterns] = useState([]);
+  const [requests, setRequests] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
 
   // 데이터 로드 함수
@@ -26,7 +27,12 @@ export default function W_ScheduleCheckScreen({ navigation }) {
 
       
       const patternRes = await client.get(`/companies/${companyId}/schedule/worker/availability-pattern`);
-      
+      const response = await client.get(`/companies/${companyId}/schedule/periods/availability`);
+      const periodList = response.data;
+
+      const opens = periodList.filter(p => p.status === "OPEN");
+      setRequests(opens);
+
       // 1. 패턴 데이터 처리
       const sortedPatterns = (patternRes.data.items || []).sort((a, b) => {
         if (a.dow !== b.dow) return a.dow - b.dow;
@@ -130,14 +136,45 @@ export default function W_ScheduleCheckScreen({ navigation }) {
             </View>
           ))
         )}
-
-        {/* === 섹션 2: 스케줄 신청 요청 (UI만 유지, 기능 삭제) === */}
+        {/* === 섹션 2: 스케줄 신청 요청 === */}
         <Text style={[styles.sectionTitle, { marginTop: 32 }]}>스케줄 신청 요청</Text>
-        
-        {/* 기능이 삭제되었으므로 항상 '없음' 상태 표시 */}
-        <View style={styles.emptyBox}>
-           <Text style={styles.emptyText}>현재 진행 중인 요청이 없습니다.</Text>
-        </View>
+          {requests.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyText}>현재 진행 중인 요청이 없습니다.</Text>
+            </View>
+          ) : (
+            requests.map((req, idx) => (
+              <TouchableOpacity 
+                key={req.periodId || idx} 
+                style={styles.requestBox}
+                onPress={() => navigation.navigate("W_ScheduleRequestScreen", { 
+                  periodId: req.periodId,
+                  periodName: req.name || `${req.startDate} 신청`
+                })}
+              >
+                <View style={styles.requestRow}>
+                  <View style={{flex: 1}}>
+                    <View style={{flexDirection:'row', alignItems:'center', marginBottom: 4}}>
+                      <Text style={styles.requestName}>
+                        {req.name && req.name !== "string" ? req.name : "스케줄 신청"}
+                      </Text>
+                      {/* 제출 완료 여부 표시 (데이터에 submitted 필드가 있다면) */}
+                      {req.submitted && (
+                        <View style={styles.submittedBadge}>
+                          <CheckCircle size={14} color="#15803d" />
+                          <Text style={styles.submittedText}>제출됨</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.requestDate}>
+                      {req.startDate} ~ {req.endDate}
+                    </Text>
+                  </View>
+                  <ChevronRight size={24} color="#999" />
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
 
       </ScrollView>
     </View>
