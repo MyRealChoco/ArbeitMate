@@ -20,7 +20,7 @@ export default function E_SwapRequestListScreen({ navigation }) {
   const [selectedSwap, setSelectedSwap] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  /** 📌 근무 교환 요청 가져오기 */
+  /* 근무 교환 요청 가져오기 */
   const loadSwaps = async () => {
     try {
       const companyId = await AsyncStorage.getItem("currentCompanyId");
@@ -39,7 +39,7 @@ export default function E_SwapRequestListScreen({ navigation }) {
     loadSwaps();
   }, []);
 
-  /**  요청 한 개 렌더 */
+  /* 요청 한 개 렌더 */
   const renderItem = ({ item }) => (
     <TouchableOpacity
       style={styles.requestCard}

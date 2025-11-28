@@ -21,7 +21,7 @@ export default function E_WorkerManageScreen({ navigation }) {
     loadWorkers();
   }, []);
 
-  /** 📌 역할(role) 목록 불러오기 */
+  /** 역할(role) 목록 불러오기 */
   const loadRoles = async () => {
     try {
       const companyId = await AsyncStorage.getItem("currentCompanyId");
@@ -32,7 +32,7 @@ export default function E_WorkerManageScreen({ navigation }) {
     }
   };
 
-  /** 📌 근무자 목록 불러오기 */
+  /**  근무자 목록 불러오기 */
   const loadWorkers = async () => {
     try {
       setLoading(true);
@@ -49,12 +49,12 @@ export default function E_WorkerManageScreen({ navigation }) {
     }
   };
 
-  /** 📌 역할ID → 역할명 변환 */
+  /**  역할ID → 역할명 변환 */
   const getRoleName = (roleId) => {
     return roles.find((r) => r.roleId === roleId)?.name || "미배정";
   };
 
-  /** 📌 리스트 아이템 */
+  /**  리스트 아이템 */
   const renderItem = ({ item }) => (
     <TouchableOpacity
       style={styles.workerCard}

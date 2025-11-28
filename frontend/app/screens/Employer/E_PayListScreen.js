@@ -28,9 +28,7 @@ export default function E_PayListScreen({ navigation }) {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
 
-      // 📌 API: (예시)
-      // GET /companies/{companyId}/salary/all?year=2025&month=10
-      // 실제 백엔드 API 이름에 맞춰 수정 필요
+      
       const res = await client.get(
         `/companies/${companyId}/salary/all`,
         { params: { year, month } }

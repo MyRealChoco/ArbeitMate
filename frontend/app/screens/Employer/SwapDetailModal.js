@@ -31,7 +31,7 @@ export default function SwapDetailModal({
     roleName,
   } = swapData;
 
-  /** ✔ 고용주가 승인 누르면 API 호출 */
+  /** 고용주가 승인 누르면 API 호출 */
   const approveSwap = async () => {
     try {
       const companyId = await AsyncStorage.getItem("currentCompanyId");
@@ -51,7 +51,7 @@ export default function SwapDetailModal({
 
   return (
     <>
-      {/* === 최초 상세 화면 === */}
+      {/*  최초 상세 화면  */}
       <Modal transparent visible={visible} animationType="fade">
         <View style={styles.overlay}>
           <View style={styles.modal}>

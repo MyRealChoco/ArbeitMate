@@ -12,16 +12,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import client from "../../services/api";
 
 export default function E_WorkerUpdateScreen({ navigation, route }) {
-  const { workerId } = route.params; // 🔥 전달된 workerId 사용
+  const { workerId } = route.params; 
 
   const [roles, setRoles] = useState([]);
   const [worker, setWorker] = useState(null);
   const [roleModal, setRoleModal] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  /* ----------------------------------
-      📌 1) 근무자 정보 조회
-  ---------------------------------- */
+  
   useEffect(() => {
     loadWorker();
     loadRoles();
@@ -38,9 +36,6 @@ export default function E_WorkerUpdateScreen({ navigation, route }) {
     }
   };
 
-  /* ----------------------------------
-      📌 2) 역할 목록 조회
-  ---------------------------------- */
   const loadRoles = async () => {
     try {
       const companyId = await AsyncStorage.getItem("currentCompanyId");
@@ -51,9 +46,7 @@ export default function E_WorkerUpdateScreen({ navigation, route }) {
     }
   };
 
-  /* ----------------------------------
-      📌 3) 저장 (PUT)
-  ---------------------------------- */
+ 
   const saveWorker = async () => {
     try {
       await client.put(`/worker/${workerId}`, worker);
