@@ -27,21 +27,18 @@ export default function E_InformationScreen({ navigation }) {
           <Text style={styles.inputText}>경기도 수원시 영통구</Text>
         </View>
 
-        <Text style={styles.label}>업종</Text>
-        <View style={styles.inputBox}>
-          <Text style={styles.inputText}>외식업</Text>
-        </View>
-
-        <Text style={styles.label}>전화번호</Text>
-        <View style={styles.inputBox}>
-          <Text style={styles.inputText}>031 - xxx - xxxx</Text>
-        </View>
+        
 
         <Text style={styles.label}>초대코드</Text>
         <View style={styles.inputBox}>
           <Text style={styles.inputText}>AWDVZ</Text>
         </View>
       </View>
+
+      <Text style={styles.label}>업무</Text>
+        <View style={styles.inputBox}>
+          <Text style={styles.inputText}></Text>
+        </View>
 
       {/* 등록 버튼 */}
       <TouchableOpacity style={styles.button}>

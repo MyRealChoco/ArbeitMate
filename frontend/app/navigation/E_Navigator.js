@@ -20,6 +20,8 @@ import E_WorkerManageScreen from "../screens/Employer/E_WorkerManageScreen.js";
 import E_WorkerTimeScreen from "../screens/Employer/E_WorkerTimeScreen.js";
 import E_WorkerTimeUpdateScreen from "../screens/Employer/E_WorkerTimeUpdateScreen.js";
 import E_WorkerUpdateScreen from "../screens/Employer/E_WorkerUpdateScreen.js";
+import E_ScheduleMainScreen from "../screens/Employer/E_ScheduleMainScreen.js";
+import ScheduleDetailModal from "../screens/Employer/ScheduleDetailModal.js";
 
 const Stack = createNativeStackNavigator();
 
@@ -45,6 +47,8 @@ export default function E_Navigator() {
       <Stack.Screen name="E_WorkerTimeScreen" component={E_WorkerTimeScreen} />
       <Stack.Screen name="E_WorkerTimeUpdateScreen" component={E_WorkerTimeUpdateScreen} />
       <Stack.Screen name="E_WorkerUpdateScreen" component={E_WorkerUpdateScreen} />
+      <Stack.Screen name="E_ScheduleMainScreen" component={E_ScheduleMainScreen} />
+      <Stack.Screen name="ScheduleDetailModal" component={ScheduleDetailModal} />
       {/* 필요 스크린 계속 추가 */}
     </Stack.Navigator>
   );

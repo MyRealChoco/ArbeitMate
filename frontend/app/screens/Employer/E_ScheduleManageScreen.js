@@ -25,7 +25,7 @@ export default function WorkManageScreen({ navigation }) {
 
         {/* 근무표 조회 */}
         <TouchableOpacity style={styles.card}
-        onPress={() => navigation.navigate("ScheduleScreen")}>
+        onPress={() => navigation.navigate("E_ScheduleMainScreen")}>
           <Text style={styles.cardTitle}>근무표 조회</Text>
           <ChevronRight size={28} color="#555" />
         </TouchableOpacity>
