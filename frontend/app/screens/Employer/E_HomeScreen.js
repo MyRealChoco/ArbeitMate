@@ -17,7 +17,7 @@ export default function E_HomeScreen({ navigation }) {
       const companyId = await AsyncStorage.getItem("currentCompanyId");
       if (!companyId) return;
 
-      // 백엔드 제공 월 단위 급여 총정리 API
+      
       const now = new Date();
       const year = now.getFullYear();
       const month = now.getMonth() + 1;
