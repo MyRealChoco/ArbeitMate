@@ -34,13 +34,9 @@ export default function W_ShiftListScreen({ navigation }) {
       const allRequests = res.data;
 
       // 3. 데이터 분리 (내가 보낸 것 vs 남이 보낸 것)
-      // 주의: 백엔드 응답에 requesterId가 포함되어 있다고 가정합니다.
-      // 만약 없다면 백엔드 DTO(SwapRequestResponse)에 requesterId 필드 추가가 필요합니다.
-      // 현재 DTO에는 requesterName만 있으므로, 정확한 구분을 위해선 requesterId가 필수입니다.
-      // (아래 코드는 requesterName 비교로 임시 처리하거나, 백엔드 수정 후 requesterId 사용 권장)
-      
+      // 백엔드 DTO(SwapRequestResponse)에 requesterId 필드 추가 필요
+      // 정확한 구분을 위해 requesterId 필요
       // [임시 로직] 내 이름과 요청자 이름이 같으면 '내가 보낸 요청'으로 처리
-      // 실제로는: request.requesterId === myId 로 비교해야 함.
       const myReqs = [];
       const otherReqs = [];
 
