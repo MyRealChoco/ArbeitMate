@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # MySQL Database Service
+  db:
+    image: mysql:8.0
+    container_name: arbeitmate-mysql
+    environment:
+      MYSQL_DATABASE: arbeitmate
+      MYSQL_ROOT_PASSWORD: rootpw
+      MYSQL_USER: arbeitmate
+      MYSQL_PASSWORD: arbeitmate_pw
+    ports:
+      - "3307:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+    restart: always
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ Service
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: arbeitmate-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    restart: always
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend Service (Spring Boot)
+  backend:
+    image: minwoo0629/opensourcesw-backend:latest
+    # build:
+    #   context: ./backend
+    #   dockerfile: Dockerfile
+    container_name: arbeitmate-backend
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/arbeitmate?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: arbeitmate
+      SPRING_DATASOURCE_PASSWORD: arbeitmate_pw
+    ports:
+      - "8080:8080"
+    restart: always
+
+  # Frontend Service (React Native Web)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: arbeitmate-frontend
+    ports:
+      - "8081:8081"
+    restart: always
+    depends_on:
+      - backend
+
+volumes:
+  db-data:
