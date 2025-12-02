@@ -6,18 +6,43 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  Alert,
 } from "react-native";
 import { ArrowLeft } from "lucide-react-native";
+import client from "../services/api";
 
-export default function WorkplaceAddScreen({ navigation , setRole }) {
-  const handleCreate = () => {
-    // 근무지 생성 로직 (DB 저장 등)
-    setRole("employer");    // 역할 확정
-  };
+export default function WorkplaceAddScreen({ navigation }) {
+
   const [storeName, setStoreName] = useState("");
   const [address, setAddress] = useState("");
-  const [category, setCategory] = useState("");
-  const [phone, setPhone] = useState("");
+
+  const handleRegister = async () => {
+    if (!storeName.trim() || !address.trim()) {
+      Alert.alert("입력 오류", "매장명과 주소는 필수 입력 사항입니다.");
+      return;
+    }
+
+    try {
+      await client.post("/companies/create", {
+        companyName: storeName,
+        companyAddress: address,
+      });
+
+      Alert.alert("생성 완료", "새로운 근무지가 등록되었습니다.", [
+        {
+          text: "확인",
+          onPress: () => {
+            // 목록 화면으로 돌아가면서 새로고침 신호 보내기
+            navigation.navigate("WorkplaceSelectScreen", { refresh: true });
+          },
+        },
+      ]);
+
+    } catch (err) {
+      console.log(err);
+      Alert.alert("생성 실패", "오류가 발생했습니다. 다시 시도해주세요.");
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -57,36 +82,10 @@ export default function WorkplaceAddScreen({ navigation , setRole }) {
           />
         </View>
 
-        {/* 업종 */}
-        <View style={styles.inputBlock}>
-          <Text style={styles.label}>업종</Text>
-          <TextInput
-            value={category}
-            onChangeText={setCategory}
-            placeholder="업종 입력"
-            style={styles.input}
-            placeholderTextColor="#9CA3AF"
-          />
-        </View>
-
-        {/* 전화번호 */}
-        <View style={styles.inputBlock}>
-          <Text style={styles.label}>전화번호</Text>
-          <TextInput
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="대표 전화번호 입력"
-            keyboardType="phone-pad"
-            style={styles.input}
-            placeholderTextColor="#9CA3AF"
-          />
-        </View>
-
       </ScrollView>
 
       {/* 등록 버튼 */}
-      <TouchableOpacity style={styles.submitButton}
-      onPress={() => navigation.navigate("WorkplaceSelectScreen")}>
+      <TouchableOpacity style={styles.submitButton} onPress={handleRegister}>
         <Text style={styles.submitText}>등록</Text>
       </TouchableOpacity>
 
